@@ -16,6 +16,10 @@ import org.slf4j.LoggerFactory;
 import static kafka.Utils.Common.createKafkaStreamsConfiguration;
 
 public class App {
+    /**
+     * Topics travels like :
+     * word-count --> word-count-output
+     */
     static Logger logger = LoggerFactory.getLogger(App.class.getSimpleName());
 
     public static void main(String[] args) {
@@ -25,6 +29,7 @@ public class App {
         KStream<String, String> textLines = builder.stream("word-count");
 
         textLines.print(Printed.toSysOut());
+        // can be replaced by check points in the debug mode
 
         KTable<String, Long> wordCounts = textLines // <NULL, " Hello WorLD ">
                 .flatMapValues(textLine -> Arrays.asList(textLine.split("\\W+"))) // <NULL, " Hello ">, <NULL, "WorLD ">
@@ -32,9 +37,7 @@ public class App {
                 .filter((key, val) -> !val.equals(""))// remove null strings
                 .selectKey((key, word) -> word)// <"hello", "hello">, <"world", "world">
                 .groupByKey()// <"hello">, <"world">
-                .count();// <"hello",1>, <"world",1>
-
-        wordCounts.toStream().print(Printed.toSysOut());
+                .count(Materialized.as("Counts"));// <"hello",1>, <"world",1>
 
         wordCounts.toStream().to("word-count-output", Produced.with(Serdes.String(), Serdes.Long()));
 
